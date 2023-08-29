@@ -18,10 +18,7 @@ async fn main() {
 
 async fn run() -> anyhow::Result<()> {
     let client = Client::default()
-    .with_url("http://localhost:8123")
-    .with_user(env::var("CLICKHOUSE_USER")?)
-    .with_password(env::var("CLICKHOUSE_PASSWORD")?)
-    .with_database(env::var("CLICKHOUSE_DATABASE")?);
+    .with_url(env::var("CLICKHOUSE_DATABASE")?);
 
     create_table_if_not_exists(&client).await?;
 
