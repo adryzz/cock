@@ -1,11 +1,13 @@
 use anyhow::anyhow;
+use clickhouse::Row;
+use serde::Serialize;
 use tokio::{
     fs::File,
     io::{AsyncBufReadExt, BufReader},
 };
 
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, Row, Serialize)]
 pub struct SystemInfo {
     pub cpu_stats: CpuStats,
     pub mem_info: MemInfo,
@@ -25,7 +27,7 @@ impl SystemInfo {
     }
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, Row, Serialize)]
 pub struct NetworkInterface {
     pub name: String,
     pub receive_bytes: u64,
@@ -84,7 +86,7 @@ impl NetworkInterface {
     }
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, Row, Serialize)]
 pub struct DiskStats {
     pub major: u64,
     pub minor: u64,
@@ -139,7 +141,7 @@ impl DiskStats {
     }
 }
 
-#[derive(Debug, Clone, Copy, sqlx::FromRow)]
+#[derive(Debug, Clone, Copy, Row, Serialize)]
 pub struct CpuStats {
     pub user: u64,
     pub nice: u64,
@@ -181,7 +183,7 @@ impl CpuStats {
     }
 }
 
-#[derive(Debug, Clone, Copy, sqlx::FromRow)]
+#[derive(Debug, Clone, Copy, Row, Serialize)]
 pub struct MemInfo {
     pub mem_total: u64,
     pub mem_free: u64,

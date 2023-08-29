@@ -1,6 +1,7 @@
-use std::time::Duration;
+use std::{time::Duration, env};
 
-use clickhouse_postgres_client::{ClickhousePgPoolOptions, ClickhousePgConnectOptions, sqlx_clickhouse_ext::sqlx_core::{pool::Pool, postgres::Postgres}};
+use clickhouse::Client;
+use tracing::debug;
 
 mod sys_info;
 
@@ -16,26 +17,28 @@ async fn main() {
 }
 
 async fn run() -> anyhow::Result<()> {
-    let database_url = "postgres://default:xxx@127.0.0.1:9005";
-    let pool = ClickhousePgPoolOptions::new()
-    .max_connections(5)
-    .connect_lazy_with(
-        database_url
-            .parse::<ClickhousePgConnectOptions>()?
-            .into_inner(),
-    );
+    let client = Client::default()
+    .with_url("http://localhost:8123")
+    .with_user(env::var("CLICKHOUSE_USER")?)
+    .with_password(env::var("CLICKHOUSE_PASSWORD")?)
+    .with_database(env::var("CLICKHOUSE_DATABASE")?);
 
-    let mut interval = tokio::time::interval(Duration::from_secs(30));
+    create_table_if_not_exists(&client).await?;
+
+    let mut interval = tokio::time::interval(Duration::from_millis(env::var("COCK_TIMER_MS")?.parse::<u64>()?));
 
     loop {
         interval.tick().await;
+        debug!("Logging system info...");
         let system_info = sys_info::SystemInfo::read_all().await?;
+        let mut insert = client.insert("system_info")?;
+        insert.write(&system_info).await?;
+        insert.end().await?;
     }
-    Ok(())
 }
 
-async fn create_table_if_not_exists(pool: &Pool<Postgres>) -> anyhow::Result<()> {
-    let query = "CREATE TABLE IF NOT EXISTS system_info (
+async fn create_table_if_not_exists(client: &Client) -> anyhow::Result<()> {
+    let query = r#"CREATE TABLE IF NOT EXISTS system_info (
         timestamp DateTime DEFAULT now(),
         cpu_stats Nested (
             user UInt64,
@@ -90,7 +93,7 @@ async fn create_table_if_not_exists(pool: &Pool<Postgres>) -> anyhow::Result<()>
             io_weighted_time UInt64)
         )
     ) ENGINE = MergeTree()
-    ORDER BY timestamp;";
-
+    ORDER BY timestamp;"#;
+    client.query(query).execute().await?;
     Ok(())
 }
