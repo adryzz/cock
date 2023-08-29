@@ -78,7 +78,7 @@ async fn create_table_if_not_exists(client: &Client) -> anyhow::Result<()> {
 
     let net_query = r#"CREATE TABLE IF NOT EXISTS net_stats (
         timestamp DateTime DEFAULT now(),
-        Array(
+        interfaces Array(
             (name String,
             receive_bytes UInt64,
             transmit_bytes UInt64,
@@ -98,7 +98,8 @@ async fn create_table_if_not_exists(client: &Client) -> anyhow::Result<()> {
     ORDER BY timestamp;"#;
 
     let disk_query = r#"CREATE TABLE IF NOT EXISTS disk_stats (
-        Array(
+        timestamp DateTime DEFAULT now(),
+        disks Array(
             (major UInt64,
             minor UInt64,
             device_name String,
