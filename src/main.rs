@@ -28,37 +28,57 @@ async fn run() -> anyhow::Result<()> {
         interval.tick().await;
         debug!("Logging system info...");
         let system_info = sys_info::SystemInfo::read_all().await?;
-        let mut insert = client.insert("system_info")?;
-        insert.write(&system_info).await?;
+        let mut insert = client.insert("cpu_stats")?;
+        insert.write(&system_info.cpu_stats).await?;
+        insert.end().await?;
+
+        let mut insert = client.insert("mem_stats")?;
+        insert.write(&system_info.mem_info).await?;
+        insert.end().await?;
+
+        let mut insert = client.insert("net_stats")?;
+        insert.write(&system_info.network_info).await?;
+        insert.end().await?;
+
+        let mut insert = client.insert("disk_stats")?;
+        insert.write(&system_info.disk_info).await?;
         insert.end().await?;
     }
 }
 
 async fn create_table_if_not_exists(client: &Client) -> anyhow::Result<()> {
-    let query = r#"CREATE TABLE IF NOT EXISTS system_info (
+    let cpu_query = r#"CREATE TABLE IF NOT EXISTS cpu_stats (
         timestamp DateTime DEFAULT now(),
-        cpu_stats Nested (
-            user UInt64,
-            nice UInt64,
-            system UInt64,
-            idle UInt64,
-            iowait UInt64,
-            irq UInt64,
-            softirq UInt64,
-            steal UInt64,
-            guest UInt64,
-            guest_nice UInt64
-        ),
-        mem_info Nested (
-            mem_total UInt64,
-            mem_free UInt64,
-            mem_available UInt64,
-            buffers UInt64,
-            cached UInt64,
-            swap_total UInt64,
-            swap_free UInt64
-        ),
-        network_info Array(
+        user UInt64,
+        nice UInt64,
+        system UInt64,
+        idle UInt64,
+        iowait UInt64,
+        irq UInt64,
+        softirq UInt64,
+        steal UInt64,
+        guest UInt64,
+        guest_nice UInt64
+        
+    ) ENGINE = MergeTree()
+    ORDER BY timestamp;"#;
+
+    let mem_query = r#"CREATE TABLE IF NOT EXISTS mem_stats (
+        timestamp DateTime DEFAULT now(),
+        mem_total UInt64,
+        mem_free UInt64,
+        mem_available UInt64,
+        buffers UInt64,
+        cached UInt64,
+        swap_total UInt64,
+        swap_free UInt64
+        
+    ) ENGINE = MergeTree()
+    ORDER BY timestamp;"#;
+
+    let net_query = r#"CREATE TABLE IF NOT EXISTS net_stats (
+        timestamp DateTime DEFAULT now(),
+        Array(
             (name String,
             receive_bytes UInt64,
             transmit_bytes UInt64,
@@ -72,8 +92,13 @@ async fn create_table_if_not_exists(client: &Client) -> anyhow::Result<()> {
             frame_errors UInt64,
             compressed_packets UInt64,
             multicast_packets UInt64)
-        ),
-        disk_info Array(
+        )
+        
+    ) ENGINE = MergeTree()
+    ORDER BY timestamp;"#;
+
+    let disk_query = r#"CREATE TABLE IF NOT EXISTS disk_stats (
+        Array(
             (major UInt64,
             minor UInt64,
             device_name String,
@@ -89,8 +114,12 @@ async fn create_table_if_not_exists(client: &Client) -> anyhow::Result<()> {
             io_time UInt64,
             io_weighted_time UInt64)
         )
+        
     ) ENGINE = MergeTree()
     ORDER BY timestamp;"#;
-    client.query(query).execute().await?;
+    client.query(cpu_query).execute().await?;
+    client.query(mem_query).execute().await?;
+    client.query(net_query).execute().await?;
+    client.query(disk_query).execute().await?;
     Ok(())
 }
